@@ -558,8 +558,7 @@ qj.make_global = lambda sym=qj, name='qj', mod=sys.modules[_builtin_module_name]
 if not hasattr(sys.modules['__main__'], '__file__'):
   qj.make_global()
   qj.LOG_FN = qj.make_global(
-      lambda *args: (logging.info(qj._COLOR_FN(*args))
-                     or print(qj._COLOR_FN(*args))),
+      lambda *args: logging.info(qj._COLOR_FN(*args)),
       'pr', sys.modules['__main__'])
   qj.PREFIX_COLOR = qj._PREFIX_COLOR_NOTEBOOK
   qj.LOG_COLOR = qj._LOG_COLOR_NOTEBOOK
