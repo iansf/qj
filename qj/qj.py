@@ -556,9 +556,18 @@ qj.make_global = lambda sym=qj, name='qj', mod=sys.modules[_builtin_module_name]
 # qj.make_global(), and also add a general print function, pr, to the interactive
 # module and set it as qj.LOG_FN.
 if not hasattr(sys.modules['__main__'], '__file__'):
+  try:
+    from colabtools import googlelog  # pylint: disable=g-import-not-at-top
+    from colabtools import outputformat  # pylint: disable=g-import-not-at-top
+    _capture = googlelog.Capture()
+    _start_capture = _capture.enter_global_mode
+    _end_capture = lambda: _capture.exit_global_mode() or outputformat.word_wrap('1')
+  except ImportError:
+    _start_capture = lambda: None
+    _end_capture = lambda: None
   qj.make_global()
   qj.LOG_FN = qj.make_global(
-      lambda *args: logging.info(qj._COLOR_FN(*args)),
+      lambda *args: _start_capture() or logging.info(qj._COLOR_FN(*args)) or _end_capture(),
       'pr', sys.modules['__main__'])
   qj.PREFIX_COLOR = qj._PREFIX_COLOR_NOTEBOOK
   qj.LOG_COLOR = qj._LOG_COLOR_NOTEBOOK
