@@ -240,7 +240,7 @@ def qj(x='',  # pylint: disable=invalid-name
 
       # Now, either we have set the log message, or we are ready to build it directly from x.
       if not log:
-        log = str(x)
+        log = qj.STR_FN(x)
       log = '(multiline log follows)\n%s' % log if '\n' in log else log
 
       padding_string = ''
@@ -265,7 +265,7 @@ def qj(x='',  # pylint: disable=invalid-name
 
       # If there's a lambda, run it and log it.
       if l:
-        log = str(l(x))
+        log = qj.STR_FN(l(x))
         log = '(multiline log follows)\n%s' % log if '\n' in log else log
         qj.LOG_FN('%s%s %s%s' % (qj.PREFIX, ' ' * len(prefix), qj._COLOR_LOG(),
                                  log))
@@ -446,7 +446,7 @@ def qj(x='',  # pylint: disable=invalid-name
       if r != _QJ_R_MAGIC:
         prefix = '%s:%s%s <%d>:' % (func_name, spaces, s or type(r), f.f_lineno)
         prefix_spaces = ' ' * len(prefix)
-        log = str(r)
+        log = qj.STR_FN(r)
         log = '(multiline log follows)\n%s' % log if '\n' in log else log
         qj.LOG_FN('%s%s %sOverridden return value: %s' % (qj.PREFIX, prefix_spaces,
                                                           qj._COLOR_LOG(), log))
@@ -529,6 +529,8 @@ qj._COLOR_FN = lambda *args: (qj._COLOR_PREFIX() +
 qj.LOG_FN = lambda *args: logging.info(qj._COLOR_FN(*args))
 qj.MAX_FRAME_LOGS = 200
 qj.PREFIX = 'qj: '
+
+qj.STR_FN = str
 
 qj._FN_MAPS = {}
 qj._DEBUG_QJ = False

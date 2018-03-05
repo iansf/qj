@@ -18,6 +18,7 @@ from __future__ import division
 from __future__ import print_function
 
 import logging
+import pprint
 import re
 import sys
 
@@ -115,6 +116,34 @@ class QjTest(unittest.TestCase):
       # mock_log_fn.reset_mock()
       # qj('some log')
       # mock_log_fn.assert_not_called()
+
+  def test_logs_with_pprint_str_fn(self):
+    str_fn = qj.STR_FN
+    with mock.patch('logging.info') as mock_log_fn:
+      qj.LOG_FN = mock_log_fn
+      try:
+        qj.STR_FN = pprint.pformat
+
+        foos = [dict(foo=x, bar=x % 2, baz=x % 3) for x in range(10)]
+        qj(foos, 'foos', l=lambda x: x, r=foos)
+
+        mock_log_fn.assert_has_calls(
+            [
+                mock.call(
+                    RegExp(r"qj: <qj_test> test_logs_with_pprint_str_fn: foos <\d+>: "
+                           r'\(multiline log follows\)\n'
+                           r"\[\{'bar': 0, 'baz': 0, 'foo': 0\},\n \{'bar': 1, 'baz': 1, 'foo': 1\}")),
+                mock.call(
+                    RegExp(r'qj:\s+\(multiline log follows\)\n'
+                           r"\[\{'bar': 0, 'baz': 0, 'foo': 0\},\n \{'bar': 1, 'baz': 1, 'foo': 1\}")),
+                mock.call(
+                    RegExp(r'qj:\s+Overridden return value: \(multiline log follows\)\n'
+                           r"\[\{'bar': 0, 'baz': 0, 'foo': 0\},\n \{'bar': 1, 'baz': 1, 'foo': 1\}")),
+            ],
+            any_order=False)
+        self.assertEqual(mock_log_fn.call_count, 3)
+      finally:
+        qj.STR_FN = str_fn
 
   def test_logs_with_x(self):
     with mock.patch('logging.info') as mock_log_fn:
