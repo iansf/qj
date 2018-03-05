@@ -21,13 +21,17 @@ def readme():
     return f.read()
 
 
+def version():
+  return '0.1.2'
+
+
 setuptools.setup(
     name='qj',
     description='qj: logging designed for debugging.',
     long_description=readme(),
-    version='0.1.1',
+    version=version(),
     url='https://github.com/iansf/qj',
-    download_url='https://github.com/iansf/qj/archive/0.1.1.tar.gz',
+    download_url='https://github.com/iansf/qj/archive/%s.tar.gz' % version(),
     author='Ian Fischer, Google',
     author_email='iansf@google.com',
     packages=['qj', 'qj_global'],
