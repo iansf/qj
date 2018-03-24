@@ -325,7 +325,9 @@ def qj(x='',  # pylint: disable=invalid-name
                                       qj._COLOR_END()),
                 first_n=qj.MAX_FRAME_LOGS if t is True else int(t),
                 summarize=qj.MAX_FRAME_LOGS,
-                name='qj_print_%s_%d' % (func_name.split(' ')[-1], f.f_lineno))
+                name='qj_print_%s_%d_%s' % (
+                    func_name.split(' ')[-1], f.f_lineno,
+                    x.name.replace('/', '_').replace(':', '_')))
 
       if tfc:
         if (hasattr(x, '__module__') and
@@ -339,7 +341,9 @@ def qj(x='',  # pylint: disable=invalid-name
               x,
               message='%s%s%s%s' % (
                   qj._COLOR_PREFIX(), qj.PREFIX, prefix[:-1], qj._COLOR_END()),
-              name='qj_check_numerics_%s_%d' % (func_name.split(' ')[-1], f.f_lineno))
+              name='qj_check_numerics_%s_%d_%s' % (
+                  func_name.split(' ')[-1], f.f_lineno,
+                  x.name.replace('/', '_').replace(':', '_')))
 
       # toc needs to be processed before tic, so that single call tic/toc works in loops.
       if toc:

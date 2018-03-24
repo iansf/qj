@@ -305,6 +305,8 @@ class QjTest(unittest.TestCase):
         def __module__(self):
           return 'tensorflow_test_module'
 
+        name = 'foo'
+
       if 'tensorflow' not in sys.modules:
         sys.modules['tensorflow'] = TestTensorClass()
         sys.modules['tensorflow'].Print = lambda s: s
