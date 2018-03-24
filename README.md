@@ -649,7 +649,7 @@ qj: <some_file> some_func: foo, pad=3 <470>: foo
 
 ## Parameters:
 
-### There are six global parameters for controlling the logger:
+### There are seven global parameters for controlling the logger:
   1. `qj.LOG`: Turns logging on or off globally. Starts out set to True, so
                logging is on.
   2. `qj.LOG_FN`: Which log function to use. All log messages are passed to this
@@ -660,21 +660,24 @@ qj: <some_file> some_func: foo, pad=3 <470>: foo
                   you can define your own log function that just calls print if
                   you don't like the default). Defaults to `logging.info` wrapped
                   in a lambda to support colorful logs.
-  3. `qj.MAX_FRAME_LOGS`: Limits the number of times per stack frame the logger
+  3. `qj.STR_FN`: Which string conversion function to use. All objects to be logged
+                  are passed to this function directly, so it must take an arbitrary
+                  python object and return a python string. Defaults to `str`, but a
+                  nice override is `pprint.pformat`.
+  4. `qj.MAX_FRAME_LOGS`: Limits the number of times per stack frame the logger
                           will print for each qj call. If the limit is hit, it
                           prints an informative message after the last log of the
                           frame. Defaults to 200.
-  4. `qj.COLOR`: Turns colored log output on or off globally.  Starts out set to
+  5. `qj.COLOR`: Turns colored log output on or off globally.  Starts out set to
                  True, so colorized logging is on.
-  5. `qj.PREFIX`: String that all qj logs will use as a prefix. Defaults to `'qj: '`.
-  6. `qj.DEBUG_FN`: Which debugger to use. You shouldn't need to set this in most
+  6. `qj.PREFIX`: String that all qj logs will use as a prefix. Defaults to `'qj: '`.
+  7. `qj.DEBUG_FN`: Which debugger to use. You shouldn't need to set this in most
                     situations. The function needs to take a single argument, which
                     is the stack frame that the logger should start in. If this is
                     not set, then the first time debugging is requested, qj attempts
                     to load ipdb. If ipdb isn't available, it falls back to using pdb.
                     In both cases, `qj.DEBUG_FN` is set to the respective `set_trace`
-                    function, although for pdb, it is wrapped in a lambda that
-                    ignores the stack frame argument, since pdb doesn't support that.
+                    function in a manner that supports setting the stack frame.
 
 
 ## Global Access:
