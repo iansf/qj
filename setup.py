@@ -13,11 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import codecs
 import setuptools
 
 
 def readme():
-  with open('README.md', encoding='utf-8') as f:
+  with codecs.open('README.md', encoding='utf-8') as f:
     return f.read()
 
 
