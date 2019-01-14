@@ -17,12 +17,12 @@ import setuptools
 
 
 def readme():
-  with open('README.md') as f:
+  with open('README.md', encoding='utf-8') as f:
     return f.read()
 
 
 def version():
-  return '0.1.4'
+  return '0.1.5'
 
 
 setuptools.setup(
