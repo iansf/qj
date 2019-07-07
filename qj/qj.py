@@ -581,20 +581,48 @@ qj.make_global = lambda sym=qj, name='qj', mod=sys.modules[_builtin_module_name]
 
 # When running qj interactively (e.g., from a colab), automatically call
 # qj.make_global(), and also add a general print function, pr, to the interactive
-# module and set it as qj.LOG_FN.
+# module and set it as qj.LOG_FN. Also make sure to capture logs and format the
+# output cell appropriately if running in colab specifically.
+# TODO(iansf):Annoyingly slow for high frequency logging in colab.
 if not hasattr(sys.modules['__main__'], '__file__'):
   try:
     from colabtools import googlelog  # pylint: disable=g-import-not-at-top
     from colabtools import outputformat  # pylint: disable=g-import-not-at-top
+    import multiprocessing  # pylint: disable=g-import-not-at-top
+    qj._last_output_format = _time.time()
     _capture = googlelog.Capture()
-    _start_capture = _capture.enter_global_mode
-    _end_capture = lambda: _capture.exit_global_mode() or outputformat.word_wrap('1')
+
+    def _start_capture():
+      if multiprocessing.current_process().name != 'MainProcess':
+        return False
+      if _capture._global_mode:
+        return False
+      _capture.enter_global_mode()
+      return True
+
+    def _end_capture():
+      if multiprocessing.current_process().name != 'MainProcess':
+        return
+      _capture.exit_global_mode()
+      cur_time = _time.time()
+      if qj._last_output_format + 3 < cur_time:
+        qj._last_output_format = cur_time
+        outputformat.word_wrap('1')
+        outputformat.max_output_height('1400')
+
   except ImportError:
     _start_capture = lambda: None
     _end_capture = lambda: None
   qj.make_global()
+
+  def _colab_log_fn(*args):
+    captured = _start_capture()
+    logging.info(qj._COLOR_FN(*args))
+    if captured:
+      _end_capture()
+
   qj.LOG_FN = qj.make_global(
-      lambda *args: _start_capture() or logging.info(qj._COLOR_FN(*args)) or _end_capture(),
+      _colab_log_fn,
       'pr', sys.modules['__main__'])
   qj.PREFIX_COLOR = qj._PREFIX_COLOR_NOTEBOOK
   qj.LOG_COLOR = qj._LOG_COLOR_NOTEBOOK
