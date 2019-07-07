@@ -294,9 +294,7 @@ def qj(x='',  # pylint: disable=invalid-name
       # If we requested tensorflow printing, wrap x in a tf.Print.
       if t:
         if (hasattr(x, '__module__') and
-            'tensorflow' in x.__module__ and
-            'tensorflow' in sys.modules):
-          tf = sys.modules['tensorflow']
+            'tensorflow' in x.__module__):
           prefix_spaces = ' ' * len(prefix)
           if 'session' in x.__module__:
             try:
@@ -319,8 +317,22 @@ def qj(x='',  # pylint: disable=invalid-name
           else:
             qj.LOG_FN('%s%s %sWrapping return value in tf.Print operation.' %
                       (qj.PREFIX, qj._COLOR_LOG(), prefix_spaces))
-            x = tf.Print(
-                x, [tf.shape(x), x],
+            try:
+              tfprint = sys.modules['tensorflow'].Print
+              tfshape = sys.modules['tensorflow'].shape
+            except:  # pylint: disable=bare-except
+              try:
+                tf = sys.modules.get(
+                    'tensorflow.python',
+                    sys.modules.get('google3.third_party.tensorflow.python'))
+                tfprint = tf.ops.logging_ops.Print
+                tfshape = tf.ops.array_ops.shape
+              except:  # pylint: disable=bare-except
+                tfprint = lambda x, *_, **__: x
+                tfshape = lambda x: []
+
+            x = tfprint(
+                x, [tfshape(x), x],
                 message='%s%s%s%s' % (qj._COLOR_PREFIX(), qj.PREFIX, prefix[:-1],
                                       qj._COLOR_END()),
                 first_n=qj.MAX_FRAME_LOGS if t is True else int(t),
@@ -331,13 +343,22 @@ def qj(x='',  # pylint: disable=invalid-name
 
       if tfc:
         if (hasattr(x, '__module__') and
-            'tensorflow' in x.__module__ and
-            'tensorflow' in sys.modules):
-          tf = sys.modules['tensorflow']
+            'tensorflow' in x.__module__):
+          try:
+            tfcheck = sys.modules['tensorflow'].check_numerics
+          except:  # pylint: disable=bare-except
+            try:
+              tf = sys.modules.get(
+                  'tensorflow.python',
+                  sys.modules.get('google3.third_party.tensorflow.python'))
+              tfcheck = tf.ops.gen_array_ops.check_numerics
+            except:  # pylint: disable=bare-except
+              tfcheck = lambda x, *_, **__: x
+
           prefix_spaces = ' ' * len(prefix)
           qj.LOG_FN('%s%s %sWrapping return value in tf.check_numerics.' %
                     (qj.PREFIX, qj._COLOR_LOG(), prefix_spaces))
-          x = tf.check_numerics(
+          x = tfcheck(
               x,
               message='%s%s%s%s' % (
                   qj._COLOR_PREFIX(), qj.PREFIX, prefix[:-1], qj._COLOR_END()),
