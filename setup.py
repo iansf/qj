@@ -23,13 +23,14 @@ def readme():
 
 
 def version():
-  return '0.1.5'
+  return '0.1.6'
 
 
 setuptools.setup(
     name='qj',
     description='qj: logging designed for debugging.',
     long_description=readme(),
+    long_description_content_type='text/markdown',
     version=version(),
     url='https://github.com/iansf/qj',
     download_url='https://github.com/iansf/qj/archive/%s.tar.gz' % version(),
@@ -39,5 +40,5 @@ setuptools.setup(
     license='Apache 2.0',
     install_requires=[],
     test_suite='nose.collector',
-    tests_require=['nose'],
+    tests_require=['nose', 'mock'],
 )
