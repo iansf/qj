@@ -300,7 +300,7 @@ def qj(x='',  # pylint: disable=invalid-name
             try:
               # pylint: disable=g-import-not-at-top
               try:
-                from tensorflow.python import debug as tf_debug
+                from tensorflow.compat.v1.python import debug as tf_debug
               except ImportError:
                 from google3.third_party.tensorflow.python import debug as tf_debug
               # pylint: enable=g-import-not-at-top
@@ -837,12 +837,14 @@ def _build_instruction_stack3(co, lasti):
 
     qj._DEBUG_QJ and qj.LOG_FN('%s\noriginal oparg_repr: %r\n     new oparg_repr: %r' % (opname, instr.argval, oparg_repr))
 
+    instr_arg = 0 if instr.arg is None else instr.arg
+
     stack_entry = _StackEntry(
-        _stack_effect3(instr.opname, instr.arg),
+        _stack_effect3(instr.opname, instr_arg),
         curr_i,
         curr_l,
         instr.opname,
-        instr.arg,
+        instr_arg,
         oparg_repr if isinstance(oparg_repr, list) else [str(oparg_repr)],
         [],  # children
     )
@@ -888,14 +890,15 @@ _STACK_EFFECTS3 = {
     'BINARY_SUBSCR': -1,
     'BINARY_FLOOR_DIVIDE': -1,
     'BINARY_TRUE_DIVIDE': -1,
+
     'INPLACE_FLOOR_DIVIDE': -1,
     'INPLACE_TRUE_DIVIDE': -1,
-
     'INPLACE_ADD': -1,
     'INPLACE_SUBTRACT': -1,
     'INPLACE_MULTIPLY': -1,
     'INPLACE_MATRIX_MULTIPLY': -1,
     'INPLACE_MODULO': -1,
+
     'STORE_SUBSCR': -3,
     'DELETE_SUBSCR': -2,
 
@@ -962,7 +965,6 @@ _STACK_EFFECTS3 = {
     'DELETE_FAST': 0,
     'STORE_ANNOTATION': -1,
 
-
     'LOAD_CLOSURE': 1,
     'LOAD_DEREF': 1,
     'LOAD_CLASSDEREF': 1,
@@ -974,6 +976,8 @@ _STACK_EFFECTS3 = {
     'GET_AITER': 0,
     'GET_ANEXT': 1,
     'GET_YIELD_FROM_ITER': 0,
+
+    'LOAD_METHOD': 1,
 }
 
 
@@ -1011,6 +1015,8 @@ def _stack_effect3(op_code, oparg):
     return -oparg
   if op_code == 'CALL_FUNCTION':
     return -oparg
+  if op_code == 'CALL_METHOD':
+    return -oparg - 1
   if op_code == 'CALL_FUNCTION_KW':
     return -oparg - 1
   if op_code == 'CALL_FUNCTION_EX':
@@ -1021,12 +1027,11 @@ def _stack_effect3(op_code, oparg):
     return -2 if (oparg == 3) else -1
   if op_code == 'FORMAT_VALUE':
     # If there's a fmt_spec on the stack we go from 2->1 else 1->1.
-    return -1 if (oparg & FVS_MASK) == FVS_HAVE_SPEC else 0
+    return -1 if (oparg & 0x4) == 0x4 else 0
   if op_code == 'EXTENDED_ARG':
     return 0  # EXTENDED_ARG just builds up a longer argument value for the next instruction (there may be multiple in a row?)
 
   return _STACK_EFFECTS3[op_code]
-
 
 
 #------------------------------------------------------------------------------
