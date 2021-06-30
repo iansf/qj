@@ -870,9 +870,12 @@ def _build_instruction_stack3(co, lasti):
 
 
 _STACK_EFFECTS3 = {
+    'NOP': 0,
+
     'POP_TOP': -1,
     'ROT_TWO': 0,
     'ROT_THREE': 0,
+    'ROT_FOUR': 0,
     'DUP_TOP': 1,
     'DUP_TOP_TWO': 2,
 
@@ -946,6 +949,10 @@ _STACK_EFFECTS3 = {
     'LOAD_NAME': 1,
     'LOAD_ATTR': 0,
     'COMPARE_OP': -1,
+    'IS_OP': -1,
+    'CONTAINS_OP': -1,
+
+    'JUMP_IF_NOT_EXC_MATCH': -2,
     'IMPORT_NAME': -1,
     'IMPORT_FROM': 1,
 
@@ -963,6 +970,8 @@ _STACK_EFFECTS3 = {
     'SETUP_LOOP': 0,
     'SETUP_EXCEPT': 6,
     'SETUP_FINALLY': 6,  # can push 3 values for the new exception + 3 others for the previous exception state
+    'RERAISE': -3,
+    'WITH_EXCEPT_START': 1,
 
     'LOAD_FAST': 1,
     'STORE_FAST': -1,
@@ -980,8 +989,16 @@ _STACK_EFFECTS3 = {
     'GET_AITER': 0,
     'GET_ANEXT': 1,
     'GET_YIELD_FROM_ITER': 0,
+    'END_ASYNC_FOR': -7,
 
     'LOAD_METHOD': 1,
+    'LOAD_ASSERTION_ERROR': 1,
+
+    'LIST_TO_TUPLE': 0,
+    'LIST_EXTEND': -1,
+    'SET_UPDATE': -1,
+    'DICT_MERGE': -1,
+    'DICT_UPDATE': -1,
 }
 
 
@@ -1325,7 +1342,7 @@ def _find_earliest_shortest_match(target, reg, search_start, search_end, num_att
   shortest_match = None
   shortest_match_search_start = 0
   shortest_match_search_end = 0
-  qj._DEBUG_QJ and qj.LOG_FN('regex: %s' % reg)
+  qj._DEBUG_QJ and qj.LOG_FN('regex: %s' % repr(reg))
   for i in range(num_attempts):
     search_target = target[search_start:search_end]
     qj._DEBUG_QJ and qj.LOG_FN('searching (%d): %s' % (i, search_target))
@@ -1456,8 +1473,42 @@ def _collect_pops(stack, depth, pops, skip):
     extract_next_tokens = -1
     expect_extracted_tokens = [
         # Expect BUILD_TUPLE as the last stack token extracted (required=False) and replace its oparg_repr with ''.
-        (abs(extract_next_tokens) - 1, 'BUILD_TUPLE', False, 'replace', [''])
+        (0, 'BUILD_TUPLE', False, 'replace', [''])
     ]
+
+  if (pops_len > 1
+      and len(stack) > 0
+      and stack[-1].opname == 'BUILD_LIST'
+      and se.opname == 'LOAD_FAST'
+      and pops[-1].opname == 'LIST_EXTEND'
+      and pops[-2].opname == 'LIST_TO_TUPLE'):
+    # BUILD_LIST followed by LOAD_FAST followed LIST_EXTEND followed by LIST_TO_TUPLE probably means we are calling a function with *args.
+    # Prepend the LOAD_FAST repr with '*' and remove the other reprs.
+    se.oparg_repr = ['*'] + se.oparg_repr
+    stack[-1].oparg_repr = ['']
+    pops[-1].oparg_repr = ['']
+    pops[-2].oparg_repr = ['']
+
+  if (pops_len > 0
+      and len(stack) > 1
+      and stack[-2].opname == 'BUILD_TUPLE'
+      and stack[-1].opname == 'BUILD_MAP'
+      and se.opname == 'LOAD_FAST'
+      and pops[-1].opname == 'DICT_MERGE'):
+    # BUILD_TUPLE followed by BUILD_MAP followed by LOAD_FAST followed DICT_MERGE probably means we are calling a function with **kwargs.
+    # Remove the BUILD_TUPLE repr but leave the others alone, as they will be handled further below.
+    stack[-2].oparg_repr = ['']
+
+  if (pops_len > 0
+      and len(stack) > 0
+      and stack[-1].opname == 'BUILD_MAP'
+      and se.opname == 'LOAD_FAST'
+      and pops[-1].opname == 'DICT_MERGE'):
+    # BUILD_MAP followed by LOAD_FAST followed DICT_MERGE probably means we are calling a function with **kwargs.
+    # Prepend the LOAD_FAST repr with '**' and remove the BUILD_MAP and DICT_MERGE reprs.
+    se.oparg_repr = ['**'] + se.oparg_repr
+    stack[-1].oparg_repr = ['']
+    pops[-1].oparg_repr = ['']
 
   if (len(stack)
       and se.opname == 'BUILD_TUPLE_UNPACK_WITH_CALL'):
@@ -1523,6 +1574,9 @@ def _collect_pops(stack, depth, pops, skip):
          and se.opname != 'BUILD_SLICE'
          and se.opname.startswith('BUILD_'))
         or se.stack_depth >= 0):
+      next_depth = se.stack_depth
+    elif (se.stack_depth < 0
+          and se.opname == 'DICT_MERGE'):
       next_depth = se.stack_depth
     else:
       next_depth = se.stack_depth - 1
@@ -1669,6 +1723,9 @@ def _build_instruction_stack(co, lasti):
           oparg_repr = ''
         elif opname == 'FOR_ITER':
           oparg_repr = ''
+        else:
+          oparg_repr = ''  # Default representation is empty.
+
       elif oparg == 0:
         if opname == 'BUILD_LIST':
           # BUILD_LIST 0 occurs at the beginning of list comprehensions
@@ -1683,6 +1740,9 @@ def _build_instruction_stack(co, lasti):
           oparg_repr = ')'
         elif opname == 'MAKE_CLOSURE':
           oparg_repr = ''
+        else:
+          oparg_repr = ''  # Default representation is empty.
+
     else:
       # Ops without arguments.
       if opname == 'UNARY_POSITIVE':
@@ -1727,6 +1787,8 @@ def _build_instruction_stack(co, lasti):
         oparg_repr = ''
       elif opname.startswith('SLICE+'):
         oparg_repr = ':'
+      else:
+        oparg_repr = ''  # Default representation is empty.
 
     stack_entry = _StackEntry(
         _stack_effect(opname, oparg),
@@ -1806,7 +1868,7 @@ def _find_current_fn_call(co, lasti):
   # Add tokens for the function call we're extracting.
   tokens = ['\\('] + tokens + ['\\)']
 
-  reg = '\b*?.*?\b*?'.join(tokens)
+  reg = r'[\b]*?.*?[\b]*?'.join(tokens)
   qj._DEBUG_QJ and qj.LOG_FN(reg)
 
   # Search for the function call using the full set of tokens.
