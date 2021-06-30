@@ -1083,13 +1083,13 @@ class QjTest(unittest.TestCase):
       dict_comp()
       mock_log_fn.assert_has_calls([
           mock.call(RegExp(
-              r'qj: <qj_test> dict_comp: v <\d+>: 1')),
+              r'qj: <qj_test> dict_comp: k <\d+>: a')),
           mock.call(RegExp(
-              r'qj: <qj_test> dict_comp:  k <\d+>: a')),
+              r'qj: <qj_test> dict_comp:  v <\d+>: 1')),
           mock.call(RegExp(
-              r'qj: <qj_test> dict_comp: v <\d+>: 2')),
+              r'qj: <qj_test> dict_comp: k <\d+>: b')),
           mock.call(RegExp(
-              r'qj: <qj_test> dict_comp:  k <\d+>: b')),
+              r'qj: <qj_test> dict_comp:  v <\d+>: 2')),
       ], any_order=True)
       self.assertEqual(mock_log_fn.call_count, 4)
 

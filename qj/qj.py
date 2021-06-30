@@ -771,6 +771,8 @@ def _build_instruction_stack3(co, lasti):
           oparg_repr = ''
         elif opname.startswith('CALL_FUNCTION'):
           oparg_repr = ')'
+        elif opname == 'CALL_METHOD':
+          oparg_repr = ')'
         elif opname == 'MAP_ADD':
           oparg_repr = ''
         elif opname == 'FOR_ITER':
@@ -786,6 +788,8 @@ def _build_instruction_stack3(co, lasti):
         elif opname == 'BUILD_MAP':
           oparg_repr = '{'
         elif opname.startswith('CALL_FUNCTION'):
+          oparg_repr = ')'
+        elif opname == 'CALL_METHOD':
           oparg_repr = ')'
     else:
       # Ops without arguments.
@@ -1450,6 +1454,10 @@ def _collect_pops(stack, depth, pops, skip):
     pops[-1].oparg_repr = ['']
     # We need to extract the arguments that we're about to load so that we can store their tokens inside of the upcoming comprehension.
     extract_next_tokens = -1
+    expect_extracted_tokens = [
+        # Expect BUILD_TUPLE as the last stack token extracted (required=False) and replace its oparg_repr with ''.
+        (abs(extract_next_tokens) - 1, 'BUILD_TUPLE', False, 'replace', [''])
+    ]
 
   if (len(stack)
       and se.opname == 'BUILD_TUPLE_UNPACK_WITH_CALL'):
