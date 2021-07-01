@@ -995,10 +995,19 @@ _STACK_EFFECTS3 = {
     'LOAD_ASSERTION_ERROR': 1,
 
     'LIST_TO_TUPLE': 0,
+    'GEN_START': -1,
     'LIST_EXTEND': -1,
     'SET_UPDATE': -1,
     'DICT_MERGE': -1,
     'DICT_UPDATE': -1,
+
+    'COPY_DICT_WITHOUT_KEYS': 0,
+    'MATCH_CLASS': -1,
+    'GET_LEN': 1,
+    'MATCH_MAPPING': 1,
+    'MATCH_SEQUENCE': 1,
+    'MATCH_KEYS': 2,
+    'ROT_N': 0,
 }
 
 
