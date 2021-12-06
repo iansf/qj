@@ -220,22 +220,22 @@ def qj(x='',  # pylint: disable=invalid-name
         except:  # pylint: disable=bare-except
           pass
 
-      if tic and x is '':
+      if tic and x == '':
         log = 'Adding tic.'
 
       # toc needs to be processed after tic here so that the log messages make sense
       # when using tic/toc in a single call in a loop.
-      if toc and x is '':
+      if toc and x == '':
         if len(qj._tics):  # pylint: disable=g-explicit-length-test
           log = 'Computing toc.'
         else:
           log = 'Unable to compute toc -- no unmatched tic.'
           toc = False
 
-      if time and x is '':
+      if time and x == '':
         log = 'Preparing decorator to measure timing...' + ('\n%s' % log if log else '')
 
-      if catch and x is '':
+      if catch and x == '':
         log = 'Preparing decorator to catch exceptions...' + ('\n%s' % log if log else '')
 
       # Now, either we have set the log message, or we are ready to build it directly from x.
@@ -396,8 +396,8 @@ def qj(x='',  # pylint: disable=invalid-name
           # pylint: disable=no-value-for-parameter
           x = _timing(logs_every=int(time))(x)
           # pylint: enable=no-value-for-parameter
-        elif x is '':
-          # x is '', so we'll assume it's the default value and we're decorating
+        elif x == '':
+          # x == '', so we'll assume it's the default value and we're decorating
           # a function
           x = lambda f: (
               (qj.LOG_FN('%s%s %sDecorating %s with timing function.' %
@@ -415,8 +415,8 @@ def qj(x='',  # pylint: disable=invalid-name
           # pylint: disable=no-value-for-parameter
           x = _catch(exception_type=catch)(x)
           # pylint: enable=no-value-for-parameter
-        elif x is '':
-          # x is '', so we'll assume it's the default value and we're decorating
+        elif x == '':
+          # x == '', so we'll assume it's the default value and we're decorating
           # a function
           x = lambda f: (
               (qj.LOG_FN('%s%s %sDecorating %s with exception function.' %
