@@ -560,7 +560,7 @@ qj.STR_FN = str
 qj._FN_MAPS = {}
 qj._DEBUG_QJ = False
 
-qj.__version__ = '0.1.0'
+qj.__version__ = '0.2.2'
 
 # Stack of tic/toc tuples.
 qj._tics = []
