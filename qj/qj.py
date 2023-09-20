@@ -220,22 +220,22 @@ def qj(x='',  # pylint: disable=invalid-name
         except:  # pylint: disable=bare-except
           pass
 
-      if tic and x is '':
+      if tic and x == '':
         log = 'Adding tic.'
 
       # toc needs to be processed after tic here so that the log messages make sense
       # when using tic/toc in a single call in a loop.
-      if toc and x is '':
+      if toc and x == '':
         if len(qj._tics):  # pylint: disable=g-explicit-length-test
           log = 'Computing toc.'
         else:
           log = 'Unable to compute toc -- no unmatched tic.'
           toc = False
 
-      if time and x is '':
+      if time and x == '':
         log = 'Preparing decorator to measure timing...' + ('\n%s' % log if log else '')
 
-      if catch and x is '':
+      if catch and x == '':
         log = 'Preparing decorator to catch exceptions...' + ('\n%s' % log if log else '')
 
       # Now, either we have set the log message, or we are ready to build it directly from x.
@@ -383,7 +383,7 @@ def qj(x='',  # pylint: disable=invalid-name
       if tic:
         tic_ = (s, _time.time())
         qj._tics.append(tic_)
-        if x is not '':
+        if x != '':
           prefix_spaces = ' ' * len(prefix)
           qj.LOG_FN('%s%s %sAdded tic.' %
                     (qj.PREFIX, qj._COLOR_LOG(), prefix_spaces))
@@ -396,7 +396,7 @@ def qj(x='',  # pylint: disable=invalid-name
           # pylint: disable=no-value-for-parameter
           x = _timing(logs_every=int(time))(x)
           # pylint: enable=no-value-for-parameter
-        elif x is '':
+        elif x == '':
           # x is '', so we'll assume it's the default value and we're decorating
           # a function
           x = lambda f: (
@@ -415,7 +415,7 @@ def qj(x='',  # pylint: disable=invalid-name
           # pylint: disable=no-value-for-parameter
           x = _catch(exception_type=catch)(x)
           # pylint: enable=no-value-for-parameter
-        elif x is '':
+        elif x == '':
           # x is '', so we'll assume it's the default value and we're decorating
           # a function
           x = lambda f: (
@@ -684,29 +684,40 @@ def _catch(f, exception_type):
 # Python 3 Helpers
 #------------------------------------------------------------------------------
 def _disassemble3(co, lasti):
-    """Disassemble a code object."""
-    cell_names = co.co_cellvars + co.co_freevars
-    linestarts = dict(dis.findlinestarts(co))
-    _disassemble_bytes(co.co_code, lasti, co.co_varnames, co.co_names,
-                       co.co_consts, cell_names, linestarts)
+  """Disassemble a code object."""
+  linestarts = dict(dis.findlinestarts(co))
+  _disassemble_bytes(co, lasti, linestarts)
+
+def _get_instruction_bytes(code, co, linestarts):
+  if sys.version_info[1] < 11:
+    return dis._get_instructions_bytes(code, co.co_varnames, co.co_names,
+                                       co.co_consts, co.co_cellvars + co.co_freevars,
+                                       linestarts)
+  else:
+    return dis._get_instructions_bytes(
+      code,
+      varname_from_oparg=co._varname_from_oparg,
+      names=co.co_names,
+      co_consts=co.co_consts,
+      linestarts=linestarts,
+      line_offset=0,
+      exception_entries=(),
+      co_positions=None,
+      show_caches=False)
 
 
-def _disassemble_bytes(code, lasti=-1, varnames=None, names=None,
-                       constants=None, cells=None, linestarts=None,
-                       line_offset=0):
-    # Omit the line number column entirely if we have no line number info
-    show_lineno = linestarts is not None
-    lineno_width = 3 if show_lineno else 0
-    for instr in dis._get_instructions_bytes(code, varnames, names,
-                                             constants, cells, linestarts,
-                                             line_offset=line_offset):
-        new_source_line = (show_lineno and
-                           instr.starts_line is not None and
-                           instr.offset > 0)
-        if new_source_line:
-            qj.LOG_FN('')
-        is_current_instr = instr.offset == lasti
-        qj.LOG_FN(instr._disassemble(lineno_width, is_current_instr))
+def _disassemble_bytes(co, lasti=-1, linestarts=None):
+  # Omit the line number column entirely if we have no line number info
+  show_lineno = linestarts is not None
+  lineno_width = 3 if show_lineno else 0
+  for instr in _get_instruction_bytes(co.co_code, co, linestarts):
+    new_source_line = (show_lineno and
+                       instr.starts_line is not None and
+                       instr.offset > 0)
+    if new_source_line:
+      qj.LOG_FN('')
+    is_current_instr = instr.offset == lasti
+    qj.LOG_FN(instr._disassemble(lineno_width, is_current_instr))
 
 
 def _build_instruction_stack3(co, lasti):
@@ -719,18 +730,20 @@ def _build_instruction_stack3(co, lasti):
   num_instr = len(code)
 
   if qj._DEBUG_QJ:
+    qj.LOG_FN('lasti = %r\nnum_instr = %r' % (lasti, num_instr))
     assert lasti < num_instr
   if lasti >= num_instr:
     return []
 
   curr_l = 0
-  for instr in dis._get_instructions_bytes(code, co.co_varnames, co.co_names,
-                                           co.co_consts, co.co_cellvars + co.co_freevars,
-                                           linestarts):
-
+  for instr in _get_instruction_bytes(code, co, linestarts):
     # instr.{opname opcode arg argval argrepr offset starts_line is_jump_target}
     curr_i = instr.offset
     curr_l = instr.starts_line or curr_l
+
+    if curr_i > lasti:
+      # In 3.11 the lasti value falls between instruction numbers for some reason, so we have to break both here and at the end of the loop.
+      break
 
     op = instr.opcode
     opname = instr.opname
@@ -755,6 +768,8 @@ def _build_instruction_stack3(co, lasti):
           oparg_repr = ['[', ']']
         else:
           oparg_repr = ''
+      elif hasattr(dis, '_Unknown') and isinstance(oparg_repr, dis._Unknown):
+        oparg_repr = ''
 
       if oparg > 0:
         if opname == 'BUILD_LIST':
@@ -773,9 +788,17 @@ def _build_instruction_stack3(co, lasti):
           oparg_repr = ')'
         elif opname == 'CALL_METHOD':
           oparg_repr = ')'
+        elif opname == 'CALL':
+          oparg_repr = ')'
+        elif opname == 'PRECALL':
+          oparg_repr = ''
         elif opname == 'MAP_ADD':
           oparg_repr = ''
         elif opname == 'FOR_ITER':
+          oparg_repr = ''
+        elif opname == 'BINARY_OP':
+          oparg_repr = instr.argrepr
+        elif opname == 'LIST_EXTEND':
           oparg_repr = ''
       elif oparg == 0:
         if opname == 'BUILD_LIST':
@@ -791,6 +814,12 @@ def _build_instruction_stack3(co, lasti):
           oparg_repr = ')'
         elif opname == 'CALL_METHOD':
           oparg_repr = ')'
+        elif opname == 'CALL':
+          oparg_repr = ')'
+        elif opname == 'PRECALL':
+          oparg_repr = ''
+        elif opname == 'BINARY_OP':
+          oparg_repr = instr.argrepr
     else:
       # Ops without arguments.
       if opname == 'UNARY_POSITIVE':
@@ -835,6 +864,8 @@ def _build_instruction_stack3(co, lasti):
         oparg_repr = ''
       elif opname.startswith('SLICE+'):
         oparg_repr = ':'
+      elif opname == 'PUSH_NULL':
+        oparg_repr = ''
 
     if isinstance(oparg_repr, tuple):
       oparg_repr = list(oparg_repr)
@@ -872,7 +903,12 @@ def _build_instruction_stack3(co, lasti):
 _STACK_EFFECTS3 = {
     'NOP': 0,
 
+    'EXTENDED_ARG': 0,
+    'RESUME': 0,
+    'CACHE': 0,
+
     'POP_TOP': -1,
+    'SWAP': 0,
     'ROT_TWO': 0,
     'ROT_THREE': 0,
     'ROT_FOUR': 0,
@@ -897,6 +933,7 @@ _STACK_EFFECTS3 = {
     'BINARY_SUBSCR': -1,
     'BINARY_FLOOR_DIVIDE': -1,
     'BINARY_TRUE_DIVIDE': -1,
+    'BINARY_OP': -1,
 
     'INPLACE_FLOOR_DIVIDE': -1,
     'INPLACE_TRUE_DIVIDE': -1,
@@ -917,6 +954,52 @@ _STACK_EFFECTS3 = {
     'INPLACE_POWER': -1,
     'GET_ITER': 0,
 
+    'ASYNC_GEN_WRAP': 0,
+    'SEND': -1,  # jump > 0 ? -1 : 0;
+
+    'CHECK_EXC_MATCH': 0,
+    'CHECK_EG_MATCH': 0,
+
+    'JUMP_FORWARD': 0,
+    'JUMP_BACKWARD': 0,
+    'JUMP': 0,
+    'JUMP_BACKWARD_NO_INTERRUPT': 0,
+    'JUMP_NO_INTERRUPT': 0,
+
+    'JUMP_IF_TRUE_OR_POP': 0,  # jump ? 0 : -1;
+    'JUMP_IF_FALSE_OR_POP': 0,  # jump ? 0 : -1;
+
+    'POP_JUMP_BACKWARD_IF_NONE': -1,
+    'POP_JUMP_FORWARD_IF_NONE': -1,
+    'POP_JUMP_IF_NONE': -1,
+    'POP_JUMP_BACKWARD_IF_NOT_NONE': -1,
+    'POP_JUMP_FORWARD_IF_NOT_NONE': -1,
+    'POP_JUMP_IF_NOT_NONE': -1,
+    'POP_JUMP_FORWARD_IF_FALSE': -1,
+    'POP_JUMP_BACKWARD_IF_FALSE': -1,
+    'POP_JUMP_IF_FALSE': -1,
+    'POP_JUMP_FORWARD_IF_TRUE': -1,
+    'POP_JUMP_BACKWARD_IF_TRUE': -1,
+    'POP_JUMP_IF_TRUE': -1,
+
+    'RETURN_GENERATOR': 0,
+
+    'KW_NAMES': 0,
+
+    'PRECALL': 0,  # Was -oparg, but needs to be 0 because CALL comes next and needs to have the -oparg.
+
+    'PREP_RERAISE_STAR': -1,
+    'PUSH_EXC_INFO': 1,
+
+    'MAKE_CELL': 0,
+    'COPY_FREE_VARS': 0,
+    'COPY': 1,
+    'PUSH_NULL': 1,
+
+    'BEFORE_WITH': 1,
+
+    'SETUP_CLEANUP': 2,  # jump ? 2 : 0
+
     'PRINT_EXPR': -1,
     'LOAD_BUILD_CLASS': 1,
     'INPLACE_LSHIFT': -1,
@@ -925,6 +1008,7 @@ _STACK_EFFECTS3 = {
     'INPLACE_XOR': -1,
     'INPLACE_OR': -1,
     'BREAK_LOOP': 0,
+    # TODO: in 3.11: jump ? 1 : 0;
     'SETUP_WITH': 7,
     'WITH_CLEANUP_START': 1,
     'WITH_CLEANUP_FINISH': -1,  # Sometimes more
@@ -934,6 +1018,7 @@ _STACK_EFFECTS3 = {
     'YIELD_VALUE': 0,
     'YIELD_FROM': -1,
     'POP_BLOCK': 0,
+    # TODO: in 3.11: -1
     'POP_EXCEPT': 0,  # -3 except if bad bytecode
     'END_FINALLY': -1,  # or -2 or -3 if exception occurred
 
@@ -969,8 +1054,9 @@ _STACK_EFFECTS3 = {
     'CONTINUE_LOOP': 0,
     'SETUP_LOOP': 0,
     'SETUP_EXCEPT': 6,
+    # TODO: in 3.11: jump ? 1 : 0;
     'SETUP_FINALLY': 6,  # can push 3 values for the new exception + 3 others for the previous exception state
-    'RERAISE': -3,
+    'RERAISE': -3,  # TODO: -1 in 3.11
     'WITH_EXCEPT_START': 1,
 
     'LOAD_FAST': 1,
@@ -989,6 +1075,7 @@ _STACK_EFFECTS3 = {
     'GET_AITER': 0,
     'GET_ANEXT': 1,
     'GET_YIELD_FROM_ITER': 0,
+    # TODO: in 3.11: -2
     'END_ASYNC_FOR': -7,
 
     'LOAD_METHOD': 1,
@@ -1002,10 +1089,12 @@ _STACK_EFFECTS3 = {
     'DICT_UPDATE': -1,
 
     'COPY_DICT_WITHOUT_KEYS': 0,
+    # TODO: in 3.11: -2
     'MATCH_CLASS': -1,
     'GET_LEN': 1,
     'MATCH_MAPPING': 1,
     'MATCH_SEQUENCE': 1,
+    # TODO: in 3.11: 1
     'MATCH_KEYS': 2,
     'ROT_N': 0,
 }
@@ -1043,6 +1132,8 @@ def _stack_effect3(op_code, oparg):
     return -oparg
   if op_code == 'RAISE_VARARGS':
     return -oparg
+  if op_code == 'CALL':
+    return -oparg
   if op_code == 'CALL_FUNCTION':
     return -oparg
   if op_code == 'CALL_METHOD':
@@ -1061,6 +1152,8 @@ def _stack_effect3(op_code, oparg):
   if op_code == 'EXTENDED_ARG':
     return 0  # EXTENDED_ARG just builds up a longer argument value for the next instruction (there may be multiple in a row?)
 
+  if op_code not in _STACK_EFFECTS3 and not qj._DEBUG_QJ:
+    return 0  # Avoid crashing just because of updated bytecode functionality.
   return _STACK_EFFECTS3[op_code]
 
 
@@ -1474,10 +1567,15 @@ def _collect_pops(stack, depth, pops, skip):
 
   if (pops_len > 0
       and se.opname == 'GET_ITER'
-      and pops[-1].opname == 'CALL_FUNCTION'):
-    # CALL_FUNCTION followed by GET_ITER means we are calling one of the comprehensions and we are about to load its arguments.
-    # The CALL_FUNCTION at the top of the stack should be invisible, since it expects a ')' which won't appear in the code.
-    pops[-1].oparg_repr = ['']
+      and pops[-1].opname in ('CALL_FUNCTION', 'PRECALL')):
+    # CALL_FUNCTION or PRECALL followed by GET_ITER means we are calling one of the comprehensions and we are about to load its arguments.
+    # The CALL_FUNCTION or PRECALL at the top of the stack should be invisible, since it expects a ')' which won't appear in the code.
+    if pops[-1].opname == 'PRECALL' and len(pops) > 2 and pops[-2].opname == 'CALL':
+      # In the case of the PRECALL CALL patter, the CALL has the expected ')' that shouldn't appear.
+      pops[-2].oparg_repr = ['']
+    else:
+      # Otherwise it's the CALL_FUNCTION that needs modification
+      pops[-1].oparg_repr = ['']
     # We need to extract the arguments that we're about to load so that we can store their tokens inside of the upcoming comprehension.
     extract_next_tokens = -1
     expect_extracted_tokens = [

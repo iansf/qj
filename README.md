@@ -134,6 +134,11 @@ itself as the description. `qj(foo * 2 + bar ** 2)` logs something like:
 qj: <some_file> some_func: foo * 2 + bar ** 2 <line_number>: 42
 ```
 
+Note that this feature may not always work. If qj can't figure out the correct source code,
+it falls back to just logging the class (e.g., `qj: <some_file> some_func: <class int> <line_number>: 42`).
+You can always disable this just by passing the second argument to qj:
+`qj(foo * 2 + bar ** 2, 'foo out')`.
+
 ### You shouldn't need to `import` just to log debug messages.
 
 Ideally, something like qj would be available as a builtin in python. We can get pretty
